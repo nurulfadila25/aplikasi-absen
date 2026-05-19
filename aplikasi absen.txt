@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="id" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aplikasi Absen</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Poppins', sans-serif; }
+    body { box-sizing: border-box; }
+    @keyframes slideIn { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .list-item { animation: slideIn 0.3s ease-out; }
+    .badge { padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+  </style>
+ </head>
+ <body class="h-full">
+  <div id="app" class="h-full w-full bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex flex-col overflow-auto"><!-- Header -->
+   <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 shadow-lg">
+    <div class="max-w-4xl mx-auto">
+     <h1 id="app-title" class="text-3xl font-bold mb-2">?? Aplikasi Absen</h1>
+     <p class="text-indigo-100">Catat kehadiran dengan mudah dan cepat</p>
+    </div>
+   </header><!-- Main Content -->
+   <main class="flex-1 max-w-4xl mx-auto w-full p-6 overflow-auto"><!-- Form Input -->
+    <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+     <h2 class="text-xl font-bold text-gray-800 mb-4">?? Input Absen</h2>
+     <form id="form-absen" class="space-y-4">
+      <div><label class="block text-sm font-semibold text-gray-700 mb-2">Nama Peserta</label> <input id="nama-input" type="text" placeholder="Masukkan nama Anda..." class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors" required>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+       <div><label class="block text-sm font-semibold text-gray-700 mb-2">Tanggal</label> <input id="tanggal-input" type="date" class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors" required>
+       </div>
+       <div><label class="block text-sm font-semibold text-gray-700 mb-2">Jam</label> <input id="jam-input" type="time" class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors" required>
+       </div>
+      </div>
+      <div><label class="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+       <div class="grid grid-cols-3 gap-2"><button type="button" id="btn-hadir" class="px-4 py-2 rounded-lg font-semibold transition-all bg-emerald-100 text-emerald-700 border-2 border-emerald-500 hover:bg-emerald-500 hover:text-white">? Hadir</button> <button type="button" id="btn-sakit" class="px-4 py-2 rounded-lg font-semibold transition-all bg-orange-100 text-orange-700 border-2 border-orange-500 hover:bg-orange-500 hover:text-white">?? Sakit</button> <button type="button" id="btn-izin" class="px-4 py-2 rounded-lg font-semibold transition-all bg-blue-100 text-blue-700 border-2 border-blue-500 hover:bg-blue-500 hover:text-white">?? Izin</button>
+       </div><input id="status-input" type="hidden" required>
+      </div><button type="submit" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-3 rounded-lg transition-all hover:scale-105 active:scale-95"> ?? Kirim Absen </button>
+     </form><!-- Status Message -->
+     <div id="status-message" class="hidden mt-4 p-3 rounded-lg text-sm font-semibold"></div>
+    </div><!-- Data List -->
+    <div class="bg-white rounded-xl shadow-md p-6">
+     <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold text-gray-800">?? Daftar Absen</h2><button id="clear-data-btn" class="text-sm bg-red-100 hover:bg-red-200 text-red-700 font-semibold px-3 py-1 rounded-lg transition-colors">??? Hapus Semua</button>
+     </div>
+     <div id="loading" class="text-center py-8">
+      <div class="inline-block animate-spin">
+       ?
+      </div>
+      <p class="text-gray-500 mt-2">Memuat data...</p>
+     </div>
+     <div id="list-container" class="hidden">
+      <div id="absen-list" class="space-y-3"></div>
+      <div id="empty-state" class="hidden text-center py-8">
+       <p class="text-gray-400 text-lg">?? Belum ada data absen</p>
+      </div>
+     </div>
+    </div>
+   </main>
+  </div>
+  <script>
+    const defaultConfig = {
+      app_title: 'Aplikasi Absen',
+      btn_hadir: 'Hadir',
+      btn_sakit: 'Sakit',
+      btn_izin: 'Izin'
+    };
+
+    let config = { ...defaultConfig };
+    let absenData = [];
+    let selectedStatus = null;
+    let isSubmitting = false;
+
+    window.elementSdk.init({
+      defaultConfig,
+      onConfigChange: async (c) => {
+        config = c;
+        document.getElementById('app-title').textContent = '?? ' + (c.app_title || defaultConfig.app_title);
+        document.getElementById('btn-hadir').innerHTML = '? ' + (c.btn_hadir || defaultConfig.btn_hadir);
+        document.getElementById('btn-sakit').innerHTML = '?? ' + (c.btn_sakit || defaultConfig.btn_sakit);
+        document.getElementById('btn-izin').innerHTML = '?? ' + (c.btn_izin || defaultConfig.btn_izin);
+      },
+      mapToCapabilities: (c) => ({
+        recolorables: [],
+        borderables: [],
+        fontEditable: undefined,
+        fontSizeable: undefined
+      }),
+      mapToEditPanelValues: (c) => new Map([
+        ['app_title', c.app_title || defaultConfig.app_title],
+        ['btn_hadir', c.btn_hadir || defaultConfig.btn_hadir],
+        ['btn_sakit', c.btn_sakit || defaultConfig.btn_sakit],
+        ['btn_izin', c.btn_izin || defaultConfig.btn_izin]
+      ])
+    });
+
+    const dataHandler = {
+      onDataChanged(data) {
+        absenData = data || [];
+        renderAbsenList();
+      }
+    };
+
+    async function initDataSdk() {
+      const result = await window.dataSdk.init(dataHandler);
+      if (!result.isOk) {
+        console.error('Failed to init Data SDK', result.error);
+      }
+    }
+
+    function renderAbsenList() {
+      const listContainer = document.getElementById('list-container');
+      const absenList = document.getElementById('absen-list');
+      const emptyState = document.getElementById('empty-state');
+      const loading = document.getElementById('loading');
+
+      loading.classList.add('hidden');
+      listContainer.classList.remove('hidden');
+
+      if (absenData.length === 0) {
+        absenList.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      absenList.innerHTML = '';
+
+      absenData.forEach(item => {
+        const statusColor = item.status === 'Hadir' ? 'bg-emerald-100 text-emerald-700' :
+                           item.status === 'Sakit' ? 'bg-orange-100 text-orange-700' :
+                           'bg-blue-100 text-blue-700';
+        
+        const statusEmoji = item.status === 'Hadir' ? '?' :
+                           item.status === 'Sakit' ? '??' : '??';
+
+        const row = document.createElement('div');
+        row.className = 'list-item bg-gray-50 p-4 rounded-lg flex justify-between items-center border-l-4 border-indigo-400 hover:shadow-md transition-shadow';
+        row.innerHTML = `
+          <div class="flex-1">
+            <p class="font-semibold text-gray-800">${item.nama}</p>
+            <p class="text-sm text-gray-500">?? ${item.tanggal} · ?? ${item.jam}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="badge ${statusColor}">${statusEmoji} ${item.status}</span>
+            <button onclick="deleteItem('${item.__backendId}')" class="text-red-500 hover:text-red-700 transition-colors">
+              <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
+            </button>
+          </div>
+        `;
+        absenList.appendChild(row);
+      });
+
+      lucide.createIcons();
+    }
+
+    async function deleteItem(backendId) {
+      const item = absenData.find(x => x.__backendId === backendId);
+      if (!item) return;
+
+      const deleteBtn = event.target.closest('button');
+      deleteBtn.disabled = true;
+      deleteBtn.style.opacity = '0.5';
+
+      const result = await window.dataSdk.delete(item);
+      if (!result.isOk) {
+        alert('Gagal menghapus data');
+        deleteBtn.disabled = false;
+        deleteBtn.style.opacity = '1';
+      }
+    }
+
+    function setStatusButton(status) {
+      document.querySelectorAll('button[id^="btn-"]').forEach(btn => {
+        btn.classList.remove('bg-emerald-500', 'bg-orange-500', 'bg-blue-500', 'text-white');
+        btn.classList.add('bg-emerald-100', 'bg-orange-100', 'bg-blue-100', 'text-emerald-700', 'text-orange-700', 'text-blue-700');
+      });
+
+      const btn = document.getElementById(`btn-${status.toLowerCase()}`);
+      btn.classList.remove('bg-emerald-100', 'bg-orange-100', 'bg-blue-100', 'text-emerald-700', 'text-orange-700', 'text-blue-700');
+      btn.classList.add('text-white');
+
+      if (status === 'Hadir') btn.classList.add('bg-emerald-500');
+      if (status === 'Sakit') btn.classList.add('bg-orange-500');
+      if (status === 'Izin') btn.classList.add('bg-blue-500');
+
+      selectedStatus = status;
+      document.getElementById('status-input').value = status;
+    }
+
+    document.getElementById('btn-hadir').addEventListener('click', () => setStatusButton('Hadir'));
+    document.getElementById('btn-sakit').addEventListener('click', () => setStatusButton('Sakit'));
+    document.getElementById('btn-izin').addEventListener('click', () => setStatusButton('Izin'));
+
+    document.getElementById('form-absen').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (!selectedStatus) {
+        showMessage('Pilih status terlebih dahulu!', 'error');
+        return;
+      }
+
+      if (isSubmitting) return;
+      isSubmitting = true;
+
+      const nama = document.getElementById('nama-input').value;
+      const tanggal = document.getElementById('tanggal-input').value;
+      const jam = document.getElementById('jam-input').value;
+
+      const submitBtn = document.querySelector('#form-absen button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = '? Mengirim...';
+
+      const result = await window.dataSdk.create({
+        nama,
+        tanggal,
+        jam,
+        status: selectedStatus
+      });
+
+      if (result.isOk) {
+        showMessage('? Absen berhasil dicatat!', 'success');
+        document.getElementById('form-absen').reset();
+        selectedStatus = null;
+        document.querySelectorAll('button[id^="btn-"]').forEach(btn => {
+          btn.classList.remove('bg-emerald-500', 'bg-orange-500', 'bg-blue-500', 'text-white');
+          btn.classList.add('bg-emerald-100', 'bg-orange-100', 'bg-blue-100', 'text-emerald-700', 'text-orange-700', 'text-blue-700');
+        });
+      } else {
+        showMessage('? Gagal mencatat absen. Coba lagi!', 'error');
+      }
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = '?? Kirim Absen';
+      isSubmitting = false;
+    });
+
+    document.getElementById('clear-data-btn').addEventListener('click', async () => {
+      if (absenData.length === 0) return;
+
+      const confirmClear = document.createElement('div');
+      confirmClear.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+      confirmClear.innerHTML = `
+        <div class="bg-white rounded-xl p-6 max-w-sm">
+          <p class="text-lg font-bold text-gray-800 mb-4">?? Hapus semua data?</p>
+          <p class="text-gray-600 mb-6">Tindakan ini tidak dapat dibatalkan.</p>
+          <div class="flex gap-3">
+            <button id="cancel-clear" class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">Batal</button>
+            <button id="confirm-clear" class="flex-1 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">Hapus</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(confirmClear);
+
+      document.getElementById('cancel-clear').addEventListener('click', () => confirmClear.remove());
+      document.getElementById('confirm-clear').addEventListener('click', async () => {
+        for (const item of absenData) {
+          await window.dataSdk.delete(item);
+        }
+        confirmClear.remove();
+      });
+    });
+
+    function showMessage(msg, type) {
+      const msgDiv = document.getElementById('status-message');
+      msgDiv.textContent = msg;
+      msgDiv.className = type === 'success' 
+        ? 'block bg-emerald-100 text-emerald-700' 
+        : 'block bg-red-100 text-red-700';
+      setTimeout(() => msgDiv.classList.add('hidden'), 3000);
+    }
+
+    // Set default date and time to today
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    document.getElementById('tanggal-input').value = dateStr;
+    document.getElementById('jam-input').value = today.toTimeString().slice(0, 5);
+
+    initDataSdk();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9fe12bd542775833',t:'MTc3OTE3MzQ2Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
