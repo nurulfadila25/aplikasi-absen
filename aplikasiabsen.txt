@@ -144,7 +144,7 @@
         row.innerHTML = `
           <div class="flex-1">
             <p class="font-semibold text-gray-800">${item.nama}</p>
-            <p class="text-sm text-gray-500">?? ${item.tanggal} · ?? ${item.jam}</p>
+            <p class="text-sm text-gray-500">?? ${item.tanggal} Â· ?? ${item.jam}</p>
           </div>
           <div class="flex items-center gap-2">
             <span class="badge ${statusColor}">${statusEmoji} ${item.status}</span>
